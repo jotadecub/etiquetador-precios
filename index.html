@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Etiquetador de Precios | Prototipo funcional</title>
+  <meta name="description" content="Prototipo funcional de aplicación web para generar etiquetas de precios y promoción para comercios." />
+  <link rel="preconnect" href="https://api.fontshare.com" />
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f6b4f' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z'/%3E%3Ccircle cx='7' cy='7' r='1' fill='%230f6b4f'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Librerías (CDN): lectura de Excel, generación de PDF y extracción de texto de PDF -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+            <circle cx="7" cy="7" r="1"/>
+          </svg>
+        </span>
+        <div>
+          <h1>Etiquetador de Precios</h1>
+          <p class="brand-sub">Prototipo funcional — etiquetas de precios y promoción para comercios</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="btn btn-ghost" data-testid="button-ejemplos" id="btn-ejemplos">Cargar datos de ejemplo</button>
+        <button type="button" class="btn btn-ghost" data-testid="button-plantilla" id="btn-plantilla">Descargar plantilla Excel</button>
+        <button type="button" class="btn btn-ghost" data-testid="button-plantilla-pdf" id="btn-plantilla-pdf">Descargar PDF de muestra</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- PASO 1: PRODUCTOS -->
+    <section class="panel" aria-labelledby="titulo-productos">
+      <div class="panel-head">
+        <div>
+          <p class="step-tag">Paso 1</p>
+          <h2 id="titulo-productos">Productos</h2>
+        </div>
+        <div class="panel-head-actions">
+          <label class="btn btn-ghost file-btn" data-testid="button-importar-excel">
+            Importar Excel (.xlsx)
+            <input type="file" id="input-excel" accept=".xlsx" hidden />
+          </label>
+          <label class="btn btn-ghost file-btn" data-testid="button-importar-pdf">
+            Importar PDF
+            <input type="file" id="input-pdf" accept="application/pdf" hidden />
+          </label>
+        </div>
+      </div>
+
+      <form class="producto-form" id="form-producto" novalidate>
+        <div class="field">
+          <label for="f-codigo">Código *</label>
+          <input id="f-codigo" data-testid="input-codigo" type="text" autocomplete="off" placeholder="Ej.: 001" />
+        </div>
+        <div class="field field-nombre">
+          <label for="f-nombre">Nombre *</label>
+          <input id="f-nombre" data-testid="input-nombre" type="text" autocomplete="off" placeholder="Ej.: Arroz Roa 500 g" />
+        </div>
+        <div class="field">
+          <label for="f-precio">Precio anterior (COP) *</label>
+          <input id="f-precio" data-testid="input-precio" type="number" min="1" step="1" placeholder="Ej.: 2500" />
+        </div>
+        <div class="field">
+          <label for="f-descuento">Descuento (%)</label>
+          <input id="f-descuento" data-testid="input-descuento" type="number" min="0" max="100" step="1" placeholder="0 a 100" />
+        </div>
+        <button type="submit" class="btn btn-primary" data-testid="button-agregar">Agregar producto</button>
+      </form>
+      <p class="form-error" id="form-error" role="alert" hidden></p>
+
+      <div class="tabla-wrap" data-testid="section-tabla">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th class="col-check"><input type="checkbox" id="check-todos" data-testid="input-seleccionar-todos" aria-label="Seleccionar todos" /></th>
+              <th>Código</th>
+              <th>Nombre</th>
+              <th class="col-num">Precio anterior</th>
+              <th class="col-num">Descuento</th>
+              <th class="col-num">Precio actual</th>
+              <th>Estado</th>
+              <th class="col-acciones">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-productos"></tbody>
+        </table>
+        <div class="tabla-vacia" id="tabla-vacia" data-testid="text-tabla-vacia">
+          <p>Aún no hay productos. Agréguelos manualmente o importe un archivo Excel o PDF.</p>
+        </div>
+      </div>
+      <p class="contador" id="contador-productos" data-testid="text-contador"></p>
+
+      <div class="import-report" id="import-report" data-testid="section-reporte-importacion" hidden>
+        <h3 id="import-report-titulo"></h3>
+        <div id="import-report-detalle"></div>
+      </div>
+    </section>
+
+    <!-- PASO 2: CONFIGURACIÓN DE ETIQUETAS -->
+    <section class="panel" aria-labelledby="titulo-etiquetas">
+      <div class="panel-head">
+        <div>
+          <p class="step-tag">Paso 2</p>
+          <h2 id="titulo-etiquetas">Configuración de etiquetas</h2>
+        </div>
+      </div>
+
+      <div class="config-grid">
+        <fieldset class="config-group">
+          <legend>Tamaño de la etiqueta</legend>
+          <label class="opcion"><input type="radio" name="tamano" value="pequeno" data-testid="input-tamano-pequeno" checked />
+            <span><strong>Pequeña</strong> — 60 × 30 mm · 24 por hoja A4</span></label>
+          <label class="opcion"><input type="radio" name="tamano" value="mediano" data-testid="input-tamano-mediano" />
+            <span><strong>Mediana</strong> — 90 × 40 mm · 12 por hoja A4</span></label>
+          <label class="opcion"><input type="radio" name="tamano" value="grande" data-testid="input-tamano-grande" />
+            <span><strong>Grande</strong> — 90 × 60 mm · 8 por hoja A4</span></label>
+        </fieldset>
+
+        <fieldset class="config-group">
+          <legend>Diseño de la etiqueta</legend>
+          <label class="opcion"><input type="radio" name="diseno" value="basico" data-testid="input-diseno-basico" checked />
+            <span><strong>Básico</strong> — código, nombre y precio</span></label>
+          <label class="opcion"><input type="radio" name="diseno" value="destacado" data-testid="input-diseno-destacado" />
+            <span><strong>Precio destacado</strong> — el valor tiene mayor tamaño</span></label>
+          <label class="opcion"><input type="radio" name="diseno" value="promocion" data-testid="input-diseno-promocion" />
+            <span><strong>Promoción</strong> — precio anterior tachado, precio actual y porcentaje</span></label>
+          <label class="opcion"><input type="radio" name="diseno" value="personalizado" data-testid="input-diseno-personalizado" />
+            <span><strong>Personalizado</strong> — diseño propio: fondo suave, insignia de descuento y precio destacado</span></label>
+        </fieldset>
+      </div>
+      <p class="nota">Las etiquetas con descuento mayor que 0% pueden usar el diseño «Promoción»; con 0% se genera una etiqueta normal. La distribución corresponde a una hoja A4 con márgenes de 10 mm y separación de 3 mm entre etiquetas; no está pensada para hojas adhesivas precortadas.</p>
+    </section>
+
+    <!-- PASO 3: VISTA PREVIA Y GENERACIÓN -->
+    <section class="panel" aria-labelledby="titulo-generar">
+      <div class="panel-head">
+        <div>
+          <p class="step-tag">Paso 3</p>
+          <h2 id="titulo-generar">Vista previa y generación</h2>
+        </div>
+        <button type="button" class="btn btn-primary" id="btn-generar" data-testid="button-generar-pdf">Generar PDF de etiquetas</button>
+      </div>
+      <div class="preview-wrap" id="preview-wrap" data-testid="section-vista-previa">
+        <p class="preview-vacia" id="preview-vacia">Seleccione productos en el paso 1 para ver la vista previa de las etiquetas.</p>
+        <div class="preview-hoja" id="preview-hoja" hidden></div>
+      </div>
+      <p class="preview-info" id="preview-info" data-testid="text-info-preview"></p>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Prototipo funcional · Proyecto de Software · Ingeniería de Software · Corporación Universitaria Iberoamericana · Noviembre de 2026</p>
+    <p class="footer-limit">Limitaciones conocidas: sin persistencia de datos al cerrar el navegador; hasta 500 productos y archivos de 5 MB; importación de PDF limitada a la plantilla tabular del proyecto.</p>
+  </footer>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
